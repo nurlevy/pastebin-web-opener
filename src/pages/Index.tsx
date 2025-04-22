@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ExternalLink } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [pastebinUrl, setPastebinUrl] = useState("");
@@ -12,10 +13,27 @@ const Index = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const { toast } = useToast();
 
   const extractUrls = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     return text.match(urlRegex) || [];
+  };
+
+  const formatPastebinUrl = (url: string) => {
+    // Check if the URL is already in raw format
+    if (url.includes('pastebin.com/raw/')) {
+      return url;
+    }
+    
+    // Convert regular pastebin URLs to raw format
+    // Example: https://pastebin.com/abcdef -> https://pastebin.com/raw/abcdef
+    const pastebinMatch = url.match(/pastebin\.com\/([a-zA-Z0-9]+)/);
+    if (pastebinMatch && pastebinMatch[1]) {
+      return `https://pastebin.com/raw/${pastebinMatch[1]}`;
+    }
+    
+    return url;
   };
 
   const handleFetchPastebin = async (e: React.FormEvent) => {
@@ -30,8 +48,12 @@ const Index = () => {
     setSuccess(false);
     
     try {
+      // Format the URL to use the raw pastebin endpoint
+      const formattedUrl = formatPastebinUrl(pastebinUrl);
+      console.log("Fetching from:", formattedUrl);
+      
       // Create a proxy URL to avoid CORS issues
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(pastebinUrl)}`;
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(formattedUrl)}`;
       const response = await fetch(proxyUrl);
       
       if (!response.ok) {
@@ -43,13 +65,27 @@ const Index = () => {
       
       if (links.length === 0) {
         setError("No links found in the pastebin content");
+        toast({
+          title: "No links found",
+          description: "The pastebin content doesn't contain any links",
+          variant: "destructive"
+        });
       } else {
         setExtractedLinks(links);
         setSuccess(true);
+        toast({
+          title: "Success!",
+          description: `Found ${links.length} link${links.length > 1 ? 's' : ''}`,
+        });
       }
     } catch (err) {
-      setError("Failed to fetch the pastebin content. Please check the URL and try again.");
       console.error(err);
+      setError("Failed to fetch the pastebin content. Make sure the URL is correct and the paste is public.");
+      toast({
+        title: "Error",
+        description: "Failed to fetch the pastebin content. Please check the URL and try again.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -85,6 +121,9 @@ const Index = () => {
                   className="w-full"
                   disabled={loading}
                 />
+                <p className="text-xs text-gray-500">
+                  Use format: https://pastebin.com/YourPasteID
+                </p>
               </div>
               
               <Button 
