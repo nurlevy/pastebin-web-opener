@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -53,38 +54,47 @@ const Index = () => {
     try {
       let urlToFetch = inputUrl;
       
-      // If it's a pastebin URL, format it properly
-      if (isPastebinUrl(inputUrl)) {
-        urlToFetch = formatPastebinUrl(inputUrl);
-        console.log("Fetching from pastebin:", urlToFetch);
-      } else {
-        // If it's a direct URL, check if it's valid
+      // If it's not a pastebin URL, handle it as a direct URL
+      if (!isPastebinUrl(inputUrl)) {
+        // If it doesn't start with http:// or https://, add https://
         if (!inputUrl.match(/^https?:\/\//)) {
           urlToFetch = `https://${inputUrl}`;
         }
-        console.log("Fetching from direct URL:", urlToFetch);
-      }
-      
-      // Create a proxy URL to avoid CORS issues
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(urlToFetch)}`;
-      const response = await fetch(proxyUrl);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch: ${response.status}`);
-      }
-      
-      // If input is a direct URL (not pastebin), add it directly to extracted links
-      if (!isPastebinUrl(inputUrl)) {
+        console.log("Opening direct URL:", urlToFetch);
+        
+        // Just add the direct URL to the list without fetching
         setExtractedLinks([urlToFetch]);
         setSuccess(true);
         toast({
           title: "Success!",
           description: "Direct URL ready to open",
         });
+        setLoading(false);
         return;
       }
       
-      // Otherwise process as pastebin content
+      // Handle pastebin URLs
+      if (isPastebinUrl(inputUrl)) {
+        urlToFetch = formatPastebinUrl(inputUrl);
+        console.log("Fetching from pastebin:", urlToFetch);
+      }
+      
+      // Use allorigins.win as an alternative CORS proxy since corsproxy.io might be failing
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(urlToFetch)}`;
+      console.log("Using proxy URL:", proxyUrl);
+      
+      const response = await fetch(proxyUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'text/plain',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.status}`);
+      }
+      
+      // Process pastebin content
       const content = await response.text();
       const links = extractUrls(content);
       
@@ -105,10 +115,11 @@ const Index = () => {
       }
     } catch (err) {
       console.error(err);
-      setError("Failed to fetch content. Please check that the URL is correct and accessible.");
+      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+      setError(`Failed to fetch content. Please check that the URL is correct and accessible. (Error: ${errorMessage})`);
       toast({
         title: "Error",
-        description: "Failed to fetch content. Please check the URL and try again.",
+        description: "Failed to fetch content. Try a different URL or direct link.",
         variant: "destructive"
       });
     } finally {
@@ -147,7 +158,7 @@ const Index = () => {
                   disabled={loading}
                 />
                 <p className="text-xs text-gray-500">
-                  Enter a direct URL or a pastebin URL
+                  Enter a direct URL (https://example.com) or a pastebin URL (https://pastebin.com/abcdef)
                 </p>
               </div>
               
@@ -156,7 +167,7 @@ const Index = () => {
                 className="w-full bg-blue-600 hover:bg-blue-700" 
                 disabled={loading}
               >
-                {loading ? "Fetching..." : "Fetch & Extract Links"}
+                {loading ? "Processing..." : "Process URL"}
               </Button>
             </form>
             
