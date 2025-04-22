@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ExternalLink, Save, Popup } from "lucide-react";
+import { ExternalLink, Save, BookOpen } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -29,7 +28,6 @@ const Index = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Load saved pastebin URL from localStorage on mount
     const saved = localStorage.getItem(SAVED_PASTE_KEY);
     if (saved) setSavedPastebinUrl(saved);
   }, []);
@@ -201,7 +199,6 @@ const Index = () => {
                     <Save className="h-4 w-4" />
                     Save
                   </Button>
-                  {/* DialogTrigger toggles the popup */}
                   <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
                     <DialogTrigger asChild>
                       <Button
@@ -212,7 +209,7 @@ const Index = () => {
                         title="Quick open saved pastebin URL"
                         disabled={!savedPastebinUrl}
                       >
-                        <Popup className="h-4 w-4" />
+                        <BookOpen className="h-4 w-4" />
                         Quick Open
                       </Button>
                     </DialogTrigger>
