@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,7 +7,7 @@ import { ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
-  const [pastebinUrl, setPastebinUrl] = useState("");
+  const [inputUrl, setInputUrl] = useState("");
   const [extractedLinks, setExtractedLinks] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +17,10 @@ const Index = () => {
   const extractUrls = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     return text.match(urlRegex) || [];
+  };
+
+  const isPastebinUrl = (url: string) => {
+    return url.includes('pastebin.com');
   };
 
   const formatPastebinUrl = (url: string) => {
@@ -36,10 +39,10 @@ const Index = () => {
     return url;
   };
 
-  const handleFetchPastebin = async (e: React.FormEvent) => {
+  const handleFetch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pastebinUrl) {
-      setError("Please enter a pastebin URL");
+    if (!inputUrl) {
+      setError("Please enter a URL");
       return;
     }
 
@@ -48,26 +51,48 @@ const Index = () => {
     setSuccess(false);
     
     try {
-      // Format the URL to use the raw pastebin endpoint
-      const formattedUrl = formatPastebinUrl(pastebinUrl);
-      console.log("Fetching from:", formattedUrl);
+      let urlToFetch = inputUrl;
+      
+      // If it's a pastebin URL, format it properly
+      if (isPastebinUrl(inputUrl)) {
+        urlToFetch = formatPastebinUrl(inputUrl);
+        console.log("Fetching from pastebin:", urlToFetch);
+      } else {
+        // If it's a direct URL, check if it's valid
+        if (!inputUrl.match(/^https?:\/\//)) {
+          urlToFetch = `https://${inputUrl}`;
+        }
+        console.log("Fetching from direct URL:", urlToFetch);
+      }
       
       // Create a proxy URL to avoid CORS issues
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(formattedUrl)}`;
+      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(urlToFetch)}`;
       const response = await fetch(proxyUrl);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status}`);
       }
       
+      // If input is a direct URL (not pastebin), add it directly to extracted links
+      if (!isPastebinUrl(inputUrl)) {
+        setExtractedLinks([urlToFetch]);
+        setSuccess(true);
+        toast({
+          title: "Success!",
+          description: "Direct URL ready to open",
+        });
+        return;
+      }
+      
+      // Otherwise process as pastebin content
       const content = await response.text();
       const links = extractUrls(content);
       
       if (links.length === 0) {
-        setError("No links found in the pastebin content");
+        setError("No links found in the content");
         toast({
           title: "No links found",
-          description: "The pastebin content doesn't contain any links",
+          description: "The content doesn't contain any links",
           variant: "destructive"
         });
       } else {
@@ -80,10 +105,10 @@ const Index = () => {
       }
     } catch (err) {
       console.error(err);
-      setError("Failed to fetch the pastebin content. Make sure the URL is correct and the paste is public.");
+      setError("Failed to fetch content. Please check that the URL is correct and accessible.");
       toast({
         title: "Error",
-        description: "Failed to fetch the pastebin content. Please check the URL and try again.",
+        description: "Failed to fetch content. Please check the URL and try again.",
         variant: "destructive"
       });
     } finally {
@@ -100,29 +125,29 @@ const Index = () => {
       <div className="max-w-md mx-auto">
         <Card className="shadow-lg">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-blue-700">Pastebin Web Opener</CardTitle>
+            <CardTitle className="text-2xl font-bold text-blue-700">Web Link Opener</CardTitle>
             <CardDescription>
-              Extract and open links from pastebin URLs
+              Open links directly or extract them from pastebin
             </CardDescription>
           </CardHeader>
           
           <CardContent>
-            <form onSubmit={handleFetchPastebin} className="space-y-4">
+            <form onSubmit={handleFetch} className="space-y-4">
               <div className="space-y-2">
-                <label htmlFor="pastebinUrl" className="text-sm font-medium">
-                  Pastebin URL
+                <label htmlFor="inputUrl" className="text-sm font-medium">
+                  URL
                 </label>
                 <Input
-                  id="pastebinUrl"
-                  type="url"
-                  placeholder="https://pastebin.com/..."
-                  value={pastebinUrl}
-                  onChange={(e) => setPastebinUrl(e.target.value)}
+                  id="inputUrl"
+                  type="text"
+                  placeholder="https://pastebin.com/... or any direct URL"
+                  value={inputUrl}
+                  onChange={(e) => setInputUrl(e.target.value)}
                   className="w-full"
                   disabled={loading}
                 />
                 <p className="text-xs text-gray-500">
-                  Use format: https://pastebin.com/YourPasteID
+                  Enter a direct URL or a pastebin URL
                 </p>
               </div>
               
@@ -131,7 +156,7 @@ const Index = () => {
                 className="w-full bg-blue-600 hover:bg-blue-700" 
                 disabled={loading}
               >
-                {loading ? "Fetching..." : "Extract Links"}
+                {loading ? "Fetching..." : "Fetch & Extract Links"}
               </Button>
             </form>
             
@@ -143,7 +168,7 @@ const Index = () => {
             
             {success && extractedLinks.length > 0 && (
               <div className="mt-6">
-                <h3 className="text-lg font-medium mb-2">Extracted Links</h3>
+                <h3 className="text-lg font-medium mb-2">Links</h3>
                 <div className="border rounded-md divide-y">
                   {extractedLinks.map((link, index) => (
                     <div 
@@ -171,7 +196,7 @@ const Index = () => {
           
           <CardFooter className="flex justify-center border-t pt-6">
             <p className="text-xs text-gray-500">
-              Note: This tool only works with public pastebin content
+              This tool works with direct URLs and pastebin content
             </p>
           </CardFooter>
         </Card>
