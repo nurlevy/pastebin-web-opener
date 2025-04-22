@@ -60,12 +60,19 @@ const Index = () => {
     return null;
   };
 
-  // Updated Quick Open functionality: fetch paste, find URL & open it
+  // Updated Quick Open functionality with CORS proxy
   const openSavedLink = async () => {
     if (!savedPastebinUrl) return;
     try {
       setLoading(true);
-      const resp = await fetch(savedPastebinUrl);
+      
+      // Use a CORS proxy to access the content
+      const corsProxyUrl = "https://api.allorigins.win/raw?url=";
+      const proxyUrl = corsProxyUrl + encodeURIComponent(savedPastebinUrl);
+      
+      console.log("Fetching from proxy URL:", proxyUrl);
+      
+      const resp = await fetch(proxyUrl);
       if (!resp.ok) throw new Error("Failed to fetch Pastebin content.");
       const text = await resp.text();
       
@@ -87,7 +94,7 @@ const Index = () => {
       console.error("Error fetching pastebin:", err); // Debug: log any errors
       toast({
         title: "Pastebin Fetch Failed",
-        description: "Could not load the RAW pastebin or find a URL.",
+        description: "Could not load the RAW pastebin or find a URL. Try a different URL.",
         variant: "destructive",
       });
     } finally {
