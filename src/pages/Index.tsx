@@ -1,11 +1,22 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Save, Popup } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+const SAVED_PASTE_KEY = "savedPastebinUrl";
 
 const Index = () => {
   const [inputUrl, setInputUrl] = useState("");
@@ -13,7 +24,15 @@ const Index = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [savedPastebinUrl, setSavedPastebinUrl] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Load saved pastebin URL from localStorage on mount
+    const saved = localStorage.getItem(SAVED_PASTE_KEY);
+    if (saved) setSavedPastebinUrl(saved);
+  }, []);
 
   const extractUrls = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -25,18 +44,11 @@ const Index = () => {
   };
 
   const formatPastebinUrl = (url: string) => {
-    // Check if the URL is already in raw format
-    if (url.includes('pastebin.com/raw/')) {
-      return url;
-    }
-    
-    // Convert regular pastebin URLs to raw format
-    // Example: https://pastebin.com/abcdef -> https://pastebin.com/raw/abcdef
+    if (url.includes('pastebin.com/raw/')) return url;
     const pastebinMatch = url.match(/pastebin\.com\/([a-zA-Z0-9]+)/);
     if (pastebinMatch && pastebinMatch[1]) {
       return `https://pastebin.com/raw/${pastebinMatch[1]}`;
     }
-    
     return url;
   };
 
@@ -50,19 +62,16 @@ const Index = () => {
     setLoading(true);
     setError(null);
     setSuccess(false);
-    
+
     try {
       let urlToFetch = inputUrl;
-      
-      // If it's not a pastebin URL, handle it as a direct URL
+
       if (!isPastebinUrl(inputUrl)) {
-        // If it doesn't start with http:// or https://, add https://
         if (!inputUrl.match(/^https?:\/\//)) {
           urlToFetch = `https://${inputUrl}`;
         }
         console.log("Opening direct URL:", urlToFetch);
-        
-        // Just add the direct URL to the list without fetching
+
         setExtractedLinks([urlToFetch]);
         setSuccess(true);
         toast({
@@ -72,32 +81,29 @@ const Index = () => {
         setLoading(false);
         return;
       }
-      
-      // Handle pastebin URLs
+
       if (isPastebinUrl(inputUrl)) {
         urlToFetch = formatPastebinUrl(inputUrl);
         console.log("Fetching from pastebin:", urlToFetch);
       }
-      
-      // Use allorigins.win as an alternative CORS proxy since corsproxy.io might be failing
+
       const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(urlToFetch)}`;
       console.log("Using proxy URL:", proxyUrl);
-      
+
       const response = await fetch(proxyUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'text/plain',
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch: ${response.status}`);
       }
-      
-      // Process pastebin content
+
       const content = await response.text();
       const links = extractUrls(content);
-      
+
       if (links.length === 0) {
         setError("No links found in the content");
         toast({
@@ -131,6 +137,28 @@ const Index = () => {
     window.open(link, "_blank", "noopener,noreferrer");
   };
 
+  const handleSave = () => {
+    if (!isPastebinUrl(inputUrl)) {
+      toast({
+        title: "Not a pastebin URL",
+        description: "Please enter a valid pastebin URL to save.",
+        variant: "destructive"
+      });
+      return;
+    }
+    const formatted = formatPastebinUrl(inputUrl);
+    setSavedPastebinUrl(formatted);
+    localStorage.setItem(SAVED_PASTE_KEY, formatted);
+    toast({
+      title: "Saved!",
+      description: "Pastebin URL saved for quick access.",
+    });
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white py-12 px-4">
       <div className="max-w-md mx-auto">
@@ -160,6 +188,73 @@ const Index = () => {
                 <p className="text-xs text-gray-500">
                   Enter a direct URL (https://example.com) or a pastebin URL (https://pastebin.com/abcdef)
                 </p>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    type="button"
+                    onClick={handleSave}
+                    variant="secondary"
+                    size="sm"
+                    disabled={loading || !inputUrl}
+                    className="flex items-center gap-1"
+                    title="Save this pastebin URL"
+                  >
+                    <Save className="h-4 w-4" />
+                    Save
+                  </Button>
+                  {/* DialogTrigger toggles the popup */}
+                  <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
+                    <DialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="flex items-center gap-1"
+                        title="Quick open saved pastebin URL"
+                        disabled={!savedPastebinUrl}
+                      >
+                        <Popup className="h-4 w-4" />
+                        Quick Open
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Saved Pastebin URL</DialogTitle>
+                        <DialogDescription>
+                          You have saved this pastebin URL for fast access.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="mt-2 flex flex-col gap-2">
+                        {savedPastebinUrl ? (
+                          <>
+                            <Input
+                              value={savedPastebinUrl}
+                              readOnly
+                              className="text-xs"
+                            />
+                            <Button
+                              variant="default"
+                              onClick={() => openLink(savedPastebinUrl)}
+                              className="flex items-center gap-1"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                              Open Saved URL
+                            </Button>
+                          </>
+                        ) : (
+                          <p className="text-sm text-gray-500">No URL saved yet.</p>
+                        )}
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="ghost"
+                          onClick={() => setDialogOpen(false)}
+                        >
+                          Close
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </div>
               
               <Button 
