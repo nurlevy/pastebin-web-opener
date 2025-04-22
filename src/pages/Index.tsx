@@ -36,16 +36,47 @@ const Index = () => {
   }, []);
 
   // Validate Pastebin URL
-  const isPastebinUrl = (url: string) => url.includes('pastebin.com');
+  const isPastebinUrl = (url: string) => url.includes("pastebin.com");
   const formatPastebinUrl = (url: string) => {
-    if (url.includes('pastebin.com/raw/')) return url;
+    if (url.includes("pastebin.com/raw/")) return url;
     const match = url.match(/pastebin\.com\/([a-zA-Z0-9]+)/);
     return match && match[1] ? `https://pastebin.com/raw/${match[1]}` : url;
   };
 
-  // Quick open functionality
-  const openSavedLink = () => {
-    if (savedPastebinUrl) window.open(savedPastebinUrl, "_blank", "noopener,noreferrer");
+  // Extract the first URL found in the given text
+  const extractFirstUrl = (text: string): string | null => {
+    // Regex for URLs (http/https) matching most common forms
+    const match = text.match(/https?:\/\/[^\s"']+/);
+    return match ? match[0] : null;
+  };
+
+  // Updated Quick Open functionality: fetch paste, find URL & open it
+  const openSavedLink = async () => {
+    if (!savedPastebinUrl) return;
+    try {
+      setLoading(true);
+      const resp = await fetch(savedPastebinUrl);
+      if (!resp.ok) throw new Error("Failed to fetch Pastebin content.");
+      const text = await resp.text();
+      const url = extractFirstUrl(text);
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      } else {
+        toast({
+          title: "No URL found",
+          description: "No valid URL was found in the pastebin.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Pastebin Fetch Failed",
+        description: "Could not load the RAW pastebin or find a URL.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Settings save handler
@@ -74,11 +105,11 @@ const Index = () => {
           className="w-full flex items-center gap-2 text-lg bg-blue-600 hover:bg-blue-700"
           size="lg"
           onClick={openSavedLink}
-          disabled={!savedPastebinUrl}
-          aria-disabled={!savedPastebinUrl}
+          disabled={!savedPastebinUrl || loading}
+          aria-disabled={!savedPastebinUrl || loading}
         >
           <BookOpen className="h-5 w-5" />
-          Quick Open
+          {loading ? "Opening..." : "Quick Open"}
         </Button>
         <Button
           className="w-full flex items-center gap-2 text-lg"
@@ -125,8 +156,6 @@ const Index = () => {
     </div>
   );
 
-  // If user hasn't navigated past the startup screen, render it
-  // You can enhance navigation later; for now, main UI is behind "startupScreen"
   return startupScreen;
 };
 
