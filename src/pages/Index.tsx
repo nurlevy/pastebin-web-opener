@@ -43,11 +43,21 @@ const Index = () => {
     return match && match[1] ? `https://pastebin.com/raw/${match[1]}` : url;
   };
 
-  // Extract the first URL found in the given text
-  const extractFirstUrl = (text: string): string | null => {
-    // Regex for URLs (http/https) matching most common forms
-    const match = text.match(/https?:\/\/[^\s"']+/);
-    return match ? match[0] : null;
+  // Improved URL extraction function
+  const extractUrl = (text: string): string | null => {
+    // More comprehensive regex that matches URLs with various protocols and formats
+    const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/i;
+    
+    const match = text.match(urlRegex);
+    if (match && match[0]) {
+      let url = match[0];
+      // Ensure the URL has a protocol
+      if (url.startsWith('www.')) {
+        url = 'https://' + url;
+      }
+      return url;
+    }
+    return null;
   };
 
   // Updated Quick Open functionality: fetch paste, find URL & open it
@@ -58,17 +68,23 @@ const Index = () => {
       const resp = await fetch(savedPastebinUrl);
       if (!resp.ok) throw new Error("Failed to fetch Pastebin content.");
       const text = await resp.text();
-      const url = extractFirstUrl(text);
+      
+      console.log("Pastebin content:", text); // Debug: log the content
+      
+      const url = extractUrl(text);
       if (url) {
+        console.log("Found URL:", url); // Debug: log the found URL
         window.open(url, "_blank", "noopener,noreferrer");
       } else {
+        console.log("No URL found in content"); // Debug: log when no URL is found
         toast({
           title: "No URL found",
-          description: "No valid URL was found in the pastebin.",
+          description: "No valid URL was found in the pastebin. Please check the content format.",
           variant: "destructive",
         });
       }
     } catch (err) {
+      console.error("Error fetching pastebin:", err); // Debug: log any errors
       toast({
         title: "Pastebin Fetch Failed",
         description: "Could not load the RAW pastebin or find a URL.",
